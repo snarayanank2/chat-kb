@@ -11,8 +11,9 @@ Ingestion worker Edge Function for manual re-sync jobs.
   - Google Slides -> Drive export (`text/plain`, PDF fallback)
   - PDF -> file download (`alt=media`)
 - Extracts and sanitizes text.
-- For low-text PDFs, optionally falls back to OpenAI PDF extraction.
+- For low-text PDFs, optionally falls back to OpenAI PDF extraction, capped by project OCR page limits.
 - Chunks text with overlap, creates embeddings in batches, and replaces source chunks transactionally (`replace_source_chunks`).
+- Enforces project hard caps for total stored chunks and emits guardrail audit events when limits are applied.
 - Marks source/job success or failure and applies retry with exponential backoff.
 - Emits ingestion audit events (`ingestion_completed`, `ingestion_failed`).
 
@@ -46,3 +47,11 @@ Runs as a worker; can process multiple jobs in one invocation (configurable).
 - `PDF_MAX_BYTES_PER_FILE` (default `10485760`)
 - `PDF_MAX_FALLBACKS_PER_RUN` (default `2`)
 - `OPENAI_PDF_EXTRACTION_MODEL` (default `gpt-4.1-mini`)
+
+## Project-level hard caps
+
+Backed by `projects` settings:
+
+- `max_sources` (enforced at DB insert trigger level)
+- `max_total_chunks` (enforced during ingestion before upsert)
+- `max_ocr_pages_per_sync` (prevents OCR fallback on oversized PDFs)

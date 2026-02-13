@@ -21,11 +21,14 @@ function json(status: number, body: JsonRecord, headers?: HeadersInit): Response
   });
 }
 
-function buildResponse(requestId: string, data: JsonRecord, status = 200): Response {
+function buildResponse(requestId: string, data: JsonRecord, status = 200, headers?: HeadersInit): Response {
   return json(status, {
     api_version: API_VERSION,
     request_id: requestId,
     data,
+  }, {
+    "x-request-id": requestId,
+    ...headers,
   });
 }
 
@@ -36,6 +39,7 @@ function buildError(
   message: string,
   retryable = false,
   details: JsonRecord = {},
+  headers?: HeadersInit,
 ): Response {
   return json(status, {
     api_version: API_VERSION,
@@ -46,6 +50,9 @@ function buildError(
       retryable,
       details,
     },
+  }, {
+    "x-request-id": requestId,
+    ...headers,
   });
 }
 
@@ -88,6 +95,10 @@ Deno.serve(async (request) => {
   }
 
   const requestId = crypto.randomUUID();
+  const traceId =
+    request.headers.get("x-trace-id")?.trim() ||
+    request.headers.get("x-request-id")?.trim() ||
+    requestId;
   if (request.method !== "POST") {
     return withCors(
       request,
@@ -338,7 +349,9 @@ Deno.serve(async (request) => {
     event_type: "ingestion_started",
     request_id: requestId,
     metadata: {
+      schema_version: 1,
       function_name: "kb_resync",
+      trace_id: traceId,
       owner_user_id: user.id,
       requested_source_id: sourceId,
       selected_source_count: sourceIds.length,
@@ -355,6 +368,8 @@ Deno.serve(async (request) => {
       enqueued_count: enqueuedJobIds.length,
       skipped_existing_count: sourceIds.length - enqueuedJobIds.length,
       selected_source_count: sourceIds.length,
+    }, 200, {
+      "x-trace-id": traceId,
     }),
   );
 });

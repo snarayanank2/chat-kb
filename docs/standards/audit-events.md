@@ -15,6 +15,7 @@ Use lowercase snake_case and `<domain>_<action>`:
 - `ingestion_started`
 - `ingestion_failed`
 - `ingestion_completed`
+- `ingestion_guardrail_enforced`
 
 ## Domain sets (v1)
 
@@ -32,6 +33,19 @@ Use lowercase snake_case and `<domain>_<action>`:
   - `ingestion_started`
   - `ingestion_failed`
   - `ingestion_completed`
+  - `ingestion_guardrail_enforced`
+
+## Metadata schema (v1)
+
+All events store structured metadata in `audit_logs.metadata` with:
+
+- `schema_version` (required, integer, currently `1`)
+- `function_name` (required, edge function source)
+- `trace_id` (required when available from headers)
+
+High-volume events may include sampling metadata:
+
+- `sample_rate` (number between `0` and `1`)
 
 ## Required metadata keys
 
@@ -40,7 +54,6 @@ Each audit event should include the following keys when available:
 - `request_id`
 - `project_id`
 - `origin`
-- `function_name`
 - `status`
 
 Optional:

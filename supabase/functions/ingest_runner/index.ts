@@ -106,6 +106,16 @@ function extractPrintableTextFromPdf(bytes: Uint8Array): string {
   return sanitizeText(runs.join("\n"));
 }
 
+function estimatePdfPageCount(bytes: Uint8Array): number {
+  try {
+    const text = new TextDecoder("latin1").decode(bytes);
+    const matches = text.match(/\/Type\s*\/Page\b/g);
+    return Math.max(1, matches?.length ?? 0);
+  } catch {
+    return 1;
+  }
+}
+
 function isLowTextPdf(text: string, minChars: number): boolean {
   const compact = text.replace(/\s+/g, "").trim();
   return compact.length < minChars;
@@ -403,6 +413,7 @@ async function markJobRetryOrFailed(
 async function runSingleJob(
   adminClient: ReturnType<typeof createClient>,
   requestId: string,
+  traceId: string,
   env: Record<string, string | undefined>,
   pdfFallbackCounter: { value: number },
 ): Promise<"processed" | "no_jobs"> {
@@ -437,7 +448,7 @@ async function runSingleJob(
 
     const { data: project, error: projectError } = await adminClient
       .from("projects")
-      .select("id,owner_user_id,name")
+      .select("id,owner_user_id,name,max_total_chunks,max_ocr_pages_per_sync")
       .eq("id", job.project_id)
       .maybeSingle();
     if (projectError || !project) {
@@ -497,12 +508,14 @@ async function runSingleJob(
       }
       extractedText = extractPrintableTextFromPdf(pdfBytes);
       extractionStrategy = "pdf_baseline";
+      const estimatedPdfPages = estimatePdfPageCount(pdfBytes);
 
       const lowText = isLowTextPdf(extractedText, minPdfTextChars);
       if (
         lowText &&
         openAiApiKey &&
-        pdfFallbackCounter.value < maxPdfFallbacks
+        pdfFallbackCounter.value < maxPdfFallbacks &&
+        estimatedPdfPages <= project.max_ocr_pages_per_sync
       ) {
         const fallbackText = await extractPdfTextWithOpenAI(
           openAiApiKey,
@@ -514,6 +527,22 @@ async function runSingleJob(
           extractionStrategy = "pdf_openai_fallback";
         }
         pdfFallbackCounter.value += 1;
+      } else if (lowText && estimatedPdfPages > project.max_ocr_pages_per_sync) {
+        extractionStrategy = "pdf_baseline_ocr_cap_enforced";
+        await adminClient.from("audit_logs").insert({
+          project_id: source.project_id,
+          event_type: "ingestion_guardrail_enforced",
+          request_id: requestId,
+          metadata: {
+            schema_version: 1,
+            function_name: "ingest_runner",
+            trace_id: traceId,
+            guardrail: "max_ocr_pages_per_sync",
+            max_ocr_pages_per_sync: project.max_ocr_pages_per_sync,
+            estimated_pdf_pages: estimatedPdfPages,
+            source_id: source.id,
+          },
+        });
       }
     }
 
@@ -524,9 +553,42 @@ async function runSingleJob(
     const chunkSize = parsePositiveInt(env.INGEST_CHUNK_SIZE_CHARS, 1200);
     const chunkOverlap = parsePositiveInt(env.INGEST_CHUNK_OVERLAP_CHARS, 200);
     const maxChunks = parsePositiveInt(env.INGEST_MAX_CHUNKS_PER_SOURCE, 300);
-    const chunks = chunkText(extractedText, chunkSize, chunkOverlap, maxChunks);
+    const { count: existingChunkCount, error: existingChunkCountError } = await adminClient
+      .from("source_chunks")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", source.project_id)
+      .neq("source_id", source.id);
+    if (existingChunkCountError) {
+      throw new Error("Failed to evaluate project chunk cap.");
+    }
+    const remainingProjectChunkBudget = Math.max(
+      0,
+      project.max_total_chunks - (existingChunkCount ?? 0),
+    );
+    if (remainingProjectChunkBudget <= 0) {
+      throw new Error("Project reached max_total_chunks cap.");
+    }
+    const effectiveMaxChunks = Math.min(maxChunks, remainingProjectChunkBudget);
+    const chunks = chunkText(extractedText, chunkSize, chunkOverlap, effectiveMaxChunks);
     if (chunks.length === 0) {
       throw new Error("Chunking yielded no content.");
+    }
+    if (effectiveMaxChunks < maxChunks) {
+      await adminClient.from("audit_logs").insert({
+        project_id: source.project_id,
+        event_type: "ingestion_guardrail_enforced",
+        request_id: requestId,
+        metadata: {
+          schema_version: 1,
+          function_name: "ingest_runner",
+          trace_id: traceId,
+          guardrail: "max_total_chunks",
+          max_total_chunks: project.max_total_chunks,
+          existing_chunks_other_sources: existingChunkCount ?? 0,
+          effective_max_chunks_for_source: effectiveMaxChunks,
+          source_id: source.id,
+        },
+      });
     }
 
     if (!openAiApiKey) {
@@ -583,7 +645,9 @@ async function runSingleJob(
       event_type: "ingestion_completed",
       request_id: requestId,
       metadata: {
+        schema_version: 1,
         function_name: "ingest_runner",
+        trace_id: traceId,
         status: "done",
         source_id: source.id,
         source_type: source.source_type,
@@ -609,7 +673,9 @@ async function runSingleJob(
       event_type: "ingestion_failed",
       request_id: requestId,
       metadata: {
+        schema_version: 1,
         function_name: "ingest_runner",
+        trace_id: traceId,
         status: retryState,
         source_id: job.source_id,
         error: errorMessage,
@@ -625,6 +691,10 @@ async function runSingleJob(
 
 Deno.serve(async (request) => {
   const requestId = crypto.randomUUID();
+  const traceId =
+    request.headers.get("x-trace-id")?.trim() ||
+    request.headers.get("x-request-id")?.trim() ||
+    requestId;
   if (request.method !== "POST") {
     return buildError(405, requestId, "method_not_allowed", "Only POST is supported.");
   }
@@ -650,7 +720,7 @@ Deno.serve(async (request) => {
   let processedJobs = 0;
 
   for (let index = 0; index < maxJobsPerRun; index += 1) {
-    const state = await runSingleJob(adminClient, requestId, env, pdfFallbackCounter);
+    const state = await runSingleJob(adminClient, requestId, traceId, env, pdfFallbackCounter);
     if (state === "no_jobs") break;
     processedJobs += 1;
   }
@@ -658,5 +728,5 @@ Deno.serve(async (request) => {
   return buildResponse(requestId, {
     processed_jobs: processedJobs,
     pdf_fallbacks_used: pdfFallbackCounter.value,
-  });
+  }, 200);
 });

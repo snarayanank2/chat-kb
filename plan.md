@@ -133,70 +133,70 @@
 ## Phase 5 - Widget session handshake and embed UX
 
 ### 5.1 `embed_session` function
-- [ ] Validate `project_handle` and resolve project settings.
-- [ ] Enforce exact-match origin allowlist.
-- [ ] Create short-lived embed token bound to project + origin + expiry.
-- [ ] Log `embed_session_created` and `blocked_origin` events.
-- [ ] Return client-safe structured error payloads.
+- [x] Validate `project_handle` and resolve project settings.
+- [x] Enforce exact-match origin allowlist.
+- [x] Create short-lived embed token bound to project + origin + expiry.
+- [x] Log `embed_session_created` and `blocked_origin` events.
+- [x] Return client-safe structured error payloads.
 
 ### 5.2 Widget SDK (`widget.js`)
-- [ ] Build embeddable loader + floating bubble UI.
-- [ ] Implement session initialization flow (`embed_session` then `chat`).
-- [ ] Add graceful error states:
+- [x] Build embeddable loader + floating bubble UI.
+- [x] Implement session initialization flow (`embed_session` then `chat`).
+- [x] Add graceful error states:
   - blocked origin
   - rate limited
   - quota exceeded
   - generic temporary failure
-- [ ] Render citations in response cards/chips.
-- [ ] Support basic theming options (position/colors/welcome text).
+- [x] Render citations in response cards/chips.
+- [x] Support basic theming options (position/colors/welcome text).
 
 ## Phase 6 - Chat endpoint with RAG + safety gates
 
 ### 6.1 Chat request pipeline (`chat`)
-- [ ] Validate embed token signature, expiry, origin binding, and project binding.
-- [ ] Enforce token bucket rate limiting (burst/refill).
-- [ ] Enforce daily/monthly usage quotas before model calls.
-- [ ] Record usage counters atomically (requests + tokens).
+- [x] Validate embed token signature, expiry, origin binding, and project binding.
+- [x] Enforce token bucket rate limiting (burst/refill).
+- [x] Enforce daily/monthly usage quotas before model calls.
+- [x] Record usage counters atomically (requests + tokens).
 
 ### 6.2 Retrieval and ranking
-- [ ] Embed query text with embedding model.
-- [ ] Retrieve top chunks from `source_chunks` filtered by project.
-- [ ] Add MMR/diversity logic to avoid single-source dominance.
-- [ ] Cap max chunks per source for resilience against malicious docs.
-- [ ] Add injection-pattern filtering on retrieved chunks.
+- [x] Embed query text with embedding model.
+- [x] Retrieve top chunks from `source_chunks` filtered by project.
+- [x] Add MMR/diversity logic to avoid single-source dominance.
+- [x] Cap max chunks per source for resilience against malicious docs.
+- [x] Add injection-pattern filtering on retrieved chunks.
 
 ### 6.3 Generation and validation
-- [ ] Build fixed prompt template with explicit `UNTRUSTED_CONTEXT` fencing.
-- [ ] Run input validation judge before retrieval/generation.
-- [ ] Generate answer with required structured citation output.
-- [ ] Run output validation judge for citation integrity and policy checks.
-- [ ] If validation fails, return safe fallback response and log reason.
+- [x] Build fixed prompt template with explicit `UNTRUSTED_CONTEXT` fencing.
+- [x] Run input validation judge before retrieval/generation.
+- [x] Generate answer with required structured citation output.
+- [x] Run output validation judge for citation integrity and policy checks.
+- [x] If validation fails, return safe fallback response and log reason.
 
 ### 6.4 Response contract
-- [ ] Return normalized schema:
+- [x] Return normalized schema:
   - `answer`
   - `citations[]` (source id/title/page/slide/chunk refs)
   - optional UI blocks / warning flags
-- [ ] Version response contract for future compatibility (`api_version`).
-- [ ] Document API contract for widget and future SDK consumers.
+- [x] Version response contract for future compatibility (`api_version`).
+- [x] Document API contract for widget and future SDK consumers.
 
 ## Phase 7 - Abuse controls, auditability, and guardrails
 
 ### 7.1 Abuse controls
-- [ ] Implement exact origin canonicalization and matching rules.
-- [ ] Add rate-limit responses (`429`) with retry hints.
-- [ ] Add quota exceeded responses with period reset metadata.
-- [ ] Add per-project hard caps (max sources, max chunks, max OCR pages).
+- [x] Implement exact origin canonicalization and matching rules.
+- [x] Add rate-limit responses (`429`) with retry hints.
+- [x] Add quota exceeded responses with period reset metadata.
+- [x] Add per-project hard caps (max sources, max chunks, max OCR pages).
 
 ### 7.2 Audit and telemetry
-- [ ] Standardize event taxonomy and metadata schema for `audit_logs`.
-- [ ] Log high-value events only; sample noisy high-volume events.
-- [ ] Hash or omit raw IP data to minimize PII footprint.
-- [ ] Add request IDs and trace correlation across function calls.
+- [x] Standardize event taxonomy and metadata schema for `audit_logs`.
+- [x] Log high-value events only; sample noisy high-volume events.
+- [x] Hash or omit raw IP data to minimize PII footprint.
+- [x] Add request IDs and trace correlation across function calls.
 
 ### 7.3 Admin/operator tooling
-- [ ] Build basic operator queries/dashboards for top failure reasons.
-- [ ] Add alerting thresholds for:
+- [x] Build basic operator queries/dashboards for top failure reasons.
+- [x] Add alerting thresholds for:
   - spike in blocked origins
   - repeated validation failures
   - ingestion backlog growth
