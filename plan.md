@@ -104,31 +104,31 @@
 ## Phase 4 - Ingestion pipeline (manual re-sync)
 
 ### 4.1 Re-sync trigger (`kb_resync`)
-- [ ] Implement owner-authenticated endpoint for source/project re-sync.
-- [ ] Enqueue jobs in `ingest_jobs` with idempotency guards.
-- [ ] Add per-project concurrency guardrails for ingestion.
+- [x] Implement owner-authenticated endpoint for source/project re-sync.
+- [x] Enqueue jobs in `ingest_jobs` with idempotency guards.
+- [x] Add per-project concurrency guardrails for ingestion.
 
 ### 4.2 Job worker (`ingest_runner`)
-- [ ] Implement job claiming with safe lock/lease semantics.
-- [ ] Load project/source context and decrypt owner refresh token.
-- [ ] Fetch content via Drive API by source type:
+- [x] Implement job claiming with safe lock/lease semantics.
+- [x] Load project/source context and decrypt owner refresh token.
+- [x] Fetch content via Drive API by source type:
   - Docs/Slides export path
   - PDFs download path
-- [ ] Extract and sanitize text content for chunking.
-- [ ] Implement retry with exponential backoff and terminal failure states.
+- [x] Extract and sanitize text content for chunking.
+- [x] Implement retry with exponential backoff and terminal failure states.
 
 ### 4.3 PDF extraction strategy
-- [ ] Implement baseline PDF text extraction.
-- [ ] Add low-text detection heuristics.
-- [ ] Add OpenAI-based PDF extraction fallback only when needed.
-- [ ] Add hard limits (pages/files per sync) to control cost.
+- [x] Implement baseline PDF text extraction.
+- [x] Add low-text detection heuristics.
+- [x] Add OpenAI-based PDF extraction fallback only when needed.
+- [x] Add hard limits (pages/files per sync) to control cost.
 
 ### 4.4 Chunking, embeddings, and storage
-- [ ] Define chunking strategy (size, overlap, separators).
-- [ ] Generate embeddings in batches for cost/perf efficiency.
-- [ ] Replace prior chunks atomically per source during re-sync.
-- [ ] Persist chunk metadata with citation anchors (doc title + page/slide).
-- [ ] Mark source status and timestamps on success/failure.
+- [x] Define chunking strategy (size, overlap, separators).
+- [x] Generate embeddings in batches for cost/perf efficiency.
+- [x] Replace prior chunks atomically per source during re-sync.
+- [x] Persist chunk metadata with citation anchors (doc title + page/slide).
+- [x] Mark source status and timestamps on success/failure.
 
 ## Phase 5 - Widget session handshake and embed UX
 
