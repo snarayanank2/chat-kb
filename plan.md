@@ -59,24 +59,24 @@
 ## Phase 2 - Owner app skeleton and authentication
 
 ### 2.1 Owner auth and app shell
-- [ ] Implement Supabase Auth (Google sign-in) in `owner-app`.
-- [ ] Add authenticated app shell and sign-out/session refresh behavior.
-- [ ] Create protected routes for project dashboard and settings pages.
+- [x] Implement Supabase Auth (Google sign-in) in `owner-app`.
+- [x] Add authenticated app shell and sign-out/session refresh behavior.
+- [x] Create protected routes for project dashboard and settings pages.
 
 ### 2.2 Project CRUD and configuration
-- [ ] Implement project create/list/delete.
-- [ ] Add project `handle` creation and uniqueness validation UX.
-- [ ] Build settings UI for:
+- [x] Implement project create/list/delete.
+- [x] Add project `handle` creation and uniqueness validation UX.
+- [x] Build settings UI for:
   - allowed origins list
   - rate limits (rpm/burst)
   - request/token quotas
   - input/output validation prompts
-- [ ] Add owner-side validation for origin format and exact-match policy.
+- [x] Add owner-side validation for origin format and exact-match policy.
 
 ### 2.3 Observability hooks in owner app
-- [ ] Show source and ingestion status badges (`pending/processing/ready/failed`).
-- [ ] Add minimal usage summary view (daily/monthly requests, token counts).
-- [ ] Add audit summary filters for high-signal events (blocked origin, rate-limited, quota-exceeded, ingestion failures).
+- [x] Show source and ingestion status badges (`pending/processing/ready/failed`).
+- [x] Add minimal usage summary view (daily/monthly requests, token counts).
+- [x] Add audit summary filters for high-signal events (blocked origin, rate-limited, quota-exceeded, ingestion failures).
 
 ## Phase 3 - Google Drive connect and source registration
 
