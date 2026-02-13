@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  getDriveConnectUrl,
+  mapMimeTypeToSourceType,
+  pickDriveDocuments,
+} from "../lib/drive";
 import { supabase } from "../lib/supabase";
 import { parseOrigins, validateOrigins } from "../lib/validation";
+import { useAuth } from "../state/AuthContext";
 import type {
   AuditLogRow,
+  GoogleConnectionRow,
   ProjectRow,
   ProjectSourceRow,
   UsageDailyRow,
@@ -19,6 +26,7 @@ const HIGH_SIGNAL_EVENTS = [
 ];
 
 export function ProjectSettingsPage() {
+  const { session, user } = useAuth();
   const params = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const projectId = params.projectId;
@@ -28,15 +36,20 @@ export function ProjectSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [originsInput, setOriginsInput] = useState("");
   const [sourceRows, setSourceRows] = useState<ProjectSourceRow[]>([]);
+  const [connection, setConnection] = useState<GoogleConnectionRow | null>(null);
   const [dailyUsage, setDailyUsage] = useState<UsageDailyRow[]>([]);
   const [monthlyUsage, setMonthlyUsage] = useState<UsageMonthlyRow[]>([]);
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [selectedEventFilters, setSelectedEventFilters] = useState<string[]>(
     HIGH_SIGNAL_EVENTS,
   );
+  const [driveConnecting, setDriveConnecting] = useState(false);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [sourceActionLoadingId, setSourceActionLoadingId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     rate_rpm: 60,
@@ -68,6 +81,15 @@ export function ProjectSettingsPage() {
     return data ?? [];
   };
 
+  const loadDriveConnection = async () => {
+    const { data, error: queryError } = await supabase
+      .from("google_connections")
+      .select("user_id,google_subject,scopes,created_at,updated_at")
+      .maybeSingle();
+    if (queryError) throw queryError;
+    setConnection(data ?? null);
+  };
+
   const hydrateProject = (value: ProjectRow) => {
     setProject(value);
     setOriginsInput(value.allowed_origins.join("\n"));
@@ -91,7 +113,9 @@ export function ProjectSettingsPage() {
     ] = await Promise.all([
       supabase
         .from("project_sources")
-        .select("id,project_id,source_type,drive_file_id,title,status,error,updated_at")
+        .select(
+          "id,project_id,source_type,drive_file_id,mime_type,title,status,error,created_at,updated_at",
+        )
         .eq("project_id", targetProjectId)
         .order("updated_at", { ascending: false }),
       supabase
@@ -138,8 +162,9 @@ export function ProjectSettingsPage() {
     const run = async () => {
       setLoading(true);
       setError(null);
+      setNotice(null);
       try {
-        const allProjects = await loadProjects();
+        const [allProjects] = await Promise.all([loadProjects(), loadDriveConnection()]);
         if (cancelled) return;
         setProjects(allProjects);
         if (!allProjects.length) {
@@ -172,6 +197,26 @@ export function ProjectSettingsPage() {
       cancelled = true;
     };
   }, [projectId]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const driveConnectStatus = url.searchParams.get("drive_connect");
+    const reason = url.searchParams.get("reason");
+    if (!driveConnectStatus) return;
+
+    if (driveConnectStatus === "success") {
+      setNotice("Google Drive connected successfully.");
+      void loadDriveConnection().catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Failed to refresh Drive connection.");
+      });
+    } else {
+      setError(`Drive connection failed${reason ? ` (${reason})` : "."}`);
+    }
+
+    url.searchParams.delete("drive_connect");
+    url.searchParams.delete("reason");
+    window.history.replaceState({}, "", url);
+  }, []);
 
   useEffect(() => {
     if (!project?.id) return;
@@ -250,6 +295,145 @@ export function ProjectSettingsPage() {
     );
   };
 
+  const connectDrive = () => {
+    if (!session || !user) {
+      setError("You must be logged in to connect Google Drive.");
+      return;
+    }
+
+    setDriveConnecting(true);
+    try {
+      const connectUrl = getDriveConnectUrl(session, user.id);
+      window.location.assign(connectUrl);
+    } catch (err) {
+      setDriveConnecting(false);
+      setError(err instanceof Error ? err.message : "Failed to start Drive OAuth flow.");
+    }
+  };
+
+  const addSourcesFromPicker = async () => {
+    if (!project) return;
+    if (!connection) {
+      setError("Connect Google Drive first before adding sources.");
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setPickerLoading(true);
+
+    try {
+      const picked = await pickDriveDocuments();
+      if (!picked.length) {
+        setNotice("No files selected.");
+        return;
+      }
+
+      const rowsToInsert = picked
+        .map((doc) => {
+          const sourceType = mapMimeTypeToSourceType(doc.mimeType);
+          if (!sourceType) return null;
+          return {
+            project_id: project.id,
+            source_type: sourceType,
+            drive_file_id: doc.id,
+            mime_type: doc.mimeType,
+            title: doc.name || doc.id,
+            status: "pending" as const,
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => row !== null);
+
+      if (!rowsToInsert.length) {
+        setError("Only Google Docs, Google Slides, and PDF files are supported.");
+        return;
+      }
+
+      const driveIds = rowsToInsert.map((row) => row.drive_file_id);
+      const { data: existing, error: existingError } = await supabase
+        .from("project_sources")
+        .select("drive_file_id")
+        .eq("project_id", project.id)
+        .in("drive_file_id", driveIds);
+
+      if (existingError) {
+        throw existingError;
+      }
+
+      const existingIds = new Set((existing ?? []).map((row) => row.drive_file_id));
+      const dedupedRows = rowsToInsert.filter((row) => !existingIds.has(row.drive_file_id));
+      const duplicateCount = rowsToInsert.length - dedupedRows.length;
+
+      if (!dedupedRows.length) {
+        setNotice("All selected files are already attached to this project.");
+        return;
+      }
+
+      const { error: insertError } = await supabase.from("project_sources").insert(dedupedRows);
+      if (insertError) {
+        if ((insertError as { code?: string }).code === "23505") {
+          setError("One or more selected files are already attached to this project.");
+          return;
+        }
+        throw insertError;
+      }
+
+      await loadObservability(project.id);
+      setNotice(
+        `Added ${dedupedRows.length} source${dedupedRows.length === 1 ? "" : "s"} as pending.${
+          duplicateCount > 0 ? ` Skipped ${duplicateCount} duplicate selection(s).` : ""
+        }`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add selected Drive sources.");
+    } finally {
+      setPickerLoading(false);
+    }
+  };
+
+  const removeSource = async (source: ProjectSourceRow) => {
+    if (!project) return;
+    const ok = window.confirm(`Remove source "${source.title || source.drive_file_id}"?`);
+    if (!ok) return;
+
+    setSourceActionLoadingId(source.id);
+    setError(null);
+    setNotice(null);
+    const { error: deleteError } = await supabase
+      .from("project_sources")
+      .delete()
+      .eq("project_id", project.id)
+      .eq("id", source.id);
+    setSourceActionLoadingId(null);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    await loadObservability(project.id);
+    setNotice("Source removed.");
+  };
+
+  const triggerResync = async (source: ProjectSourceRow) => {
+    if (!project) return;
+    setSourceActionLoadingId(source.id);
+    setError(null);
+    setNotice(null);
+
+    const { error: invokeError } = await supabase.functions.invoke("kb_resync", {
+      body: { project_id: project.id, source_id: source.id },
+    });
+    setSourceActionLoadingId(null);
+
+    if (invokeError) {
+      setError(invokeError.message);
+      return;
+    }
+
+    setNotice(`Re-sync requested for "${source.title || source.drive_file_id}".`);
+  };
+
   if (loading) {
     return <p className="state-text">Loading project settings...</p>;
   }
@@ -268,6 +452,34 @@ export function ProjectSettingsPage() {
     <div className="stack">
       <section className="panel">
         <h1>Project settings</h1>
+        <div className="status-row">
+          <span
+            className={`status-pill ${
+              connection ? "status-ready" : "status-pending"
+            }`}
+          >
+            Drive: {connection ? "connected" : "not connected"}
+          </span>
+          <button type="button" onClick={connectDrive} disabled={driveConnecting}>
+            {driveConnecting
+              ? "Redirecting..."
+              : connection
+                ? "Reconnect Drive"
+                : "Connect Drive"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void addSourcesFromPicker()}
+            disabled={pickerLoading || !connection}
+          >
+            {pickerLoading ? "Opening picker..." : "Add Drive sources"}
+          </button>
+        </div>
+        {connection ? (
+          <p className="muted small-text">
+            Connected subject: <code>{connection.google_subject}</code>
+          </p>
+        ) : null}
         <div className="project-switcher">
           <span className="muted">Project:</span>
           <select
@@ -412,6 +624,7 @@ export function ProjectSettingsPage() {
           </button>
         </form>
         {error ? <p className="error">{error}</p> : null}
+        {notice ? <p className="notice">{notice}</p> : null}
       </section>
 
       <section className="panel">
@@ -437,14 +650,16 @@ export function ProjectSettingsPage() {
                 <th>Title</th>
                 <th>Type</th>
                 <th>Status</th>
+                <th>Added</th>
                 <th>Last update</th>
                 <th>Error</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {sourceRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="muted">
+                  <td colSpan={7} className="muted">
                     No sources added yet.
                   </td>
                 </tr>
@@ -454,8 +669,25 @@ export function ProjectSettingsPage() {
                     <td>{row.title || row.drive_file_id}</td>
                     <td>{row.source_type}</td>
                     <td>{row.status}</td>
+                    <td>{new Date(row.created_at).toLocaleString()}</td>
                     <td>{new Date(row.updated_at).toLocaleString()}</td>
                     <td>{row.error ?? "-"}</td>
+                    <td className="row-actions">
+                      <button
+                        type="button"
+                        onClick={() => void triggerResync(row)}
+                        disabled={sourceActionLoadingId === row.id}
+                      >
+                        Re-sync
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeSource(row)}
+                        disabled={sourceActionLoadingId === row.id}
+                      >
+                        Remove
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

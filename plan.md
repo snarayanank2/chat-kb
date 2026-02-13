@@ -81,25 +81,25 @@
 ## Phase 3 - Google Drive connect and source registration
 
 ### 3.1 Drive OAuth function (`drive_connect`)
-- [ ] Implement OAuth callback Edge Function:
+- [x] Implement OAuth callback Edge Function:
   - exchange code for tokens
   - retrieve Google subject/account identity
   - encrypt refresh token
   - persist in `google_connections`
-- [ ] Restrict requested scopes to minimal file-picker compatible scope.
-- [ ] Add robust error mapping (expired code, consent revoked, insufficient scopes).
+- [x] Restrict requested scopes to minimal file-picker compatible scope.
+- [x] Add robust error mapping (expired code, consent revoked, insufficient scopes).
 
 ### 3.2 Encryption utilities
-- [ ] Implement server-side encrypt/decrypt utility with key versioning support.
-- [ ] Add key rotation plan (read-old/write-new strategy).
-- [ ] Add unit tests for encryption roundtrip and invalid key handling.
+- [x] Implement server-side encrypt/decrypt utility with key versioning support.
+- [x] Add key rotation plan (read-old/write-new strategy).
+- [x] Add unit tests for encryption roundtrip and invalid key handling.
 
 ### 3.3 File picker + source linking
-- [ ] Integrate Google file picker in owner app.
-- [ ] Support allowed source types: Docs, Slides, PDF.
-- [ ] Persist source selections into `project_sources` with status `pending`.
-- [ ] Add duplicate-source detection by `(project_id, drive_file_id)`.
-- [ ] Provide source list UI with remove/re-sync actions.
+- [x] Integrate Google file picker in owner app.
+- [x] Support allowed source types: Docs, Slides, PDF.
+- [x] Persist source selections into `project_sources` with status `pending`.
+- [x] Add duplicate-source detection by `(project_id, drive_file_id)`.
+- [x] Provide source list UI with remove/re-sync actions.
 
 ## Phase 4 - Ingestion pipeline (manual re-sync)
 

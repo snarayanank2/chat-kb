@@ -23,9 +23,19 @@ export type ProjectSourceRow = {
   project_id: string;
   source_type: "gdoc" | "gslides" | "gpdf";
   drive_file_id: string;
+  mime_type: string | null;
   title: string;
   status: SourceStatus;
   error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GoogleConnectionRow = {
+  user_id: string;
+  google_subject: string;
+  scopes: string[];
+  created_at: string;
   updated_at: string;
 };
 
@@ -70,6 +80,7 @@ export type Database = {
         Partial<Omit<ProjectRow, "id" | "owner_user_id" | "created_at">>
       >;
       project_sources: TableDef<ProjectSourceRow>;
+      google_connections: TableDef<GoogleConnectionRow>;
       project_usage_daily: TableDef<UsageDailyRow>;
       project_usage_monthly: TableDef<UsageMonthlyRow>;
       audit_logs: TableDef<AuditLogRow>;

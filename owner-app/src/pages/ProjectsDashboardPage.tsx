@@ -59,7 +59,9 @@ export function ProjectsDashboardPage() {
     const ids = projectData.map((project) => project.id);
     const { data: sourceData, error: sourceError } = await supabase
       .from("project_sources")
-      .select("id,project_id,source_type,drive_file_id,title,status,error,updated_at")
+      .select(
+        "id,project_id,source_type,drive_file_id,mime_type,title,status,error,created_at,updated_at",
+      )
       .in("project_id", ids);
 
     if (sourceError) {

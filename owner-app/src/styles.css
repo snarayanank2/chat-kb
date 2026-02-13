@@ -143,6 +143,14 @@ button:disabled {
   color: #dc2626;
 }
 
+.notice {
+  color: #0369a1;
+}
+
+.small-text {
+  font-size: 0.9rem;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
