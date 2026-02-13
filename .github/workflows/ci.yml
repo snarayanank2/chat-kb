@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Lint owner-app if present
+        if: ${{ hashFiles('owner-app/package.json') != '' }}
+        working-directory: owner-app
+        run: |
+          npm ci
+          npm run lint --if-present
+
+      - name: Lint widget if present
+        if: ${{ hashFiles('widget/package.json') != '' }}
+        working-directory: widget
+        run: |
+          npm ci
+          npm run lint --if-present
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Test owner-app if present
+        if: ${{ hashFiles('owner-app/package.json') != '' }}
+        working-directory: owner-app
+        run: |
+          npm ci
+          npm test --if-present
+
+      - name: Test widget if present
+        if: ${{ hashFiles('widget/package.json') != '' }}
+        working-directory: widget
+        run: |
+          npm ci
+          npm test --if-present
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build owner-app if present
+        if: ${{ hashFiles('owner-app/package.json') != '' }}
+        working-directory: owner-app
+        run: |
+          npm ci
+          npm run build --if-present
+
+      - name: Build widget if present
+        if: ${{ hashFiles('widget/package.json') != '' }}
+        working-directory: widget
+        run: |
+          npm ci
+          npm run build --if-present
+
+  deploy:
+    name: Deploy (skeleton)
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy gate check
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then
+            echo "Skipping deploy: missing SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF."
+            exit 0
+          fi
+          echo "Deploy skeleton ready. Add migration/function deploy commands in later phases."
