@@ -27,11 +27,11 @@
 ## Phase 1 - Database schema, indexes, and access controls
 
 ### 1.1 Core schema migrations
-- [ ] Create `projects` table with handle uniqueness, quotas, rate config, validation prompts, timestamps.
-- [ ] Create `google_connections` table with encrypted refresh token fields (`refresh_token_ciphertext`, `nonce`, `key_version`), scopes, timestamps.
-- [ ] Create `project_sources` table with source metadata and ingestion status lifecycle.
-- [ ] Create `source_chunks` with chunk metadata and vector column for embeddings.
-- [ ] Create ingestion/control tables:
+- [x] Create `projects` table with handle uniqueness, quotas, rate config, validation prompts, timestamps.
+- [x] Create `google_connections` table with encrypted refresh token fields (`refresh_token_ciphertext`, `nonce`, `key_version`), scopes, timestamps.
+- [x] Create `project_sources` table with source metadata and ingestion status lifecycle.
+- [x] Create `source_chunks` with chunk metadata and vector column for embeddings.
+- [x] Create ingestion/control tables:
   - `ingest_jobs`
   - `rate_limit_buckets`
   - `project_usage_daily`
@@ -39,22 +39,22 @@
   - `audit_logs`
 
 ### 1.2 Constraints, indexes, and retention
-- [ ] Add FK constraints and cascade rules for project deletion safety.
-- [ ] Add indexes for:
+- [x] Add FK constraints and cascade rules for project deletion safety.
+- [x] Add indexes for:
   - `projects(handle)`
   - `project_sources(project_id, status)`
   - `source_chunks(project_id, source_id)`
   - `ingest_jobs(status, created_at)`
   - usage tables by `(project_id, date/month)`
   - `audit_logs(project_id, timestamp, event_type)`
-- [ ] Add pgvector extension and similarity index strategy suitable for expected scale.
-- [ ] Define retention and archival policies for audit and usage data.
+- [x] Add pgvector extension and similarity index strategy suitable for expected scale.
+- [x] Define retention and archival policies for audit and usage data.
 
 ### 1.3 RLS and server access model
-- [ ] Enable RLS on owner-facing tables.
-- [ ] Add policies restricting owner access to `owner_user_id = auth.uid()`.
-- [ ] Keep widget-facing access out of direct DB; route through Edge Functions with service-role checks.
-- [ ] Add migration tests/verification SQL for policy correctness.
+- [x] Enable RLS on owner-facing tables.
+- [x] Add policies restricting owner access to `owner_user_id = auth.uid()`.
+- [x] Keep widget-facing access out of direct DB; route through Edge Functions with service-role checks.
+- [x] Add migration tests/verification SQL for policy correctness.
 
 ## Phase 2 - Owner app skeleton and authentication
 
