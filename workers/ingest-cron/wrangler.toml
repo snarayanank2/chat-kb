@@ -1,0 +1,11 @@
+name = "chat-kb-ingest-cron"
+main = "src/index.ts"
+compatibility_date = "2026-02-13"
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+# Example:
+# INGEST_RUNNER_URL = "https://<PROJECT_REF>.supabase.co/functions/v1/ingest_runner"
+INGEST_RUNNER_TIMEOUT_MS = "25000"
