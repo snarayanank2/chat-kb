@@ -492,7 +492,7 @@ async function runSingleJob(
     const maxPdfBytes = parsePositiveInt(env.PDF_MAX_BYTES_PER_FILE, 10 * 1024 * 1024);
     const maxPdfFallbacks = parsePositiveInt(env.PDF_MAX_FALLBACKS_PER_RUN, 2);
     const openAiApiKey = env.OPENAI_API_KEY;
-    const openAiPdfModel = env.OPENAI_PDF_EXTRACTION_MODEL ?? "gpt-4.1-mini";
+    const openAiPdfModel = env.OPENAI_PDF_EXTRACTION_MODEL ?? "gpt-5-mini";
 
     let extractedText = "";
     let extractionStrategy = "drive_export_text";

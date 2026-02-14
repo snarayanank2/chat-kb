@@ -46,7 +46,7 @@ Runs as a worker; can process multiple jobs in one invocation (configurable).
 - `PDF_LOW_TEXT_MIN_CHARS` (default `600`)
 - `PDF_MAX_BYTES_PER_FILE` (default `10485760`)
 - `PDF_MAX_FALLBACKS_PER_RUN` (default `2`)
-- `OPENAI_PDF_EXTRACTION_MODEL` (default `gpt-4.1-mini`)
+- `OPENAI_PDF_EXTRACTION_MODEL` (default `gpt-5-mini`)
 
 ## Project-level hard caps
 

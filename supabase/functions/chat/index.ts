@@ -2,8 +2,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 const API_VERSION = "v1";
 const OPENAI_RESPONSES_API = "https://api.openai.com/v1/responses";
-const DEFAULT_CHAT_MODEL = "gpt-4.1-mini";
-const DEFAULT_VALIDATION_MODEL = "gpt-4.1-mini";
+const DEFAULT_CHAT_MODEL = "gpt-5-mini";
+const DEFAULT_VALIDATION_MODEL = "gpt-5-mini";
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const DEFAULT_RETRIEVAL_CANDIDATES = 20;
 const DEFAULT_RETRIEVAL_FINAL = 8;

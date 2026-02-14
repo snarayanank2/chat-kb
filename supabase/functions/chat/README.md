@@ -70,8 +70,8 @@ RAG chat Edge Function for widget clients using short-lived embed tokens.
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `EMBED_TOKEN_SIGNING_SECRET`
 - `OPENAI_API_KEY`
-- `OPENAI_CHAT_MODEL` (optional, default `gpt-4.1-mini`)
-- `OPENAI_VALIDATION_MODEL` (optional, default `gpt-4.1-mini`)
+- `OPENAI_CHAT_MODEL` (optional, default `gpt-5-mini`)
+- `OPENAI_VALIDATION_MODEL` (optional, default `gpt-5-mini`)
 - `OPENAI_EMBEDDING_MODEL` (optional, default `text-embedding-3-small`)
 - `CHAT_RETRIEVAL_CANDIDATES` (optional, default `20`)
 - `CHAT_RETRIEVAL_FINAL` (optional, default `8`)
