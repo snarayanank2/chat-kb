@@ -6,7 +6,7 @@ This README is a production deployment runbook for all app parts using:
 
 - Supabase (database + Edge Functions)
 - Cloudflare Pages (owner app + widget script hosting)
-- Google Cloud (OAuth + Picker + Drive APIs)
+- Google Cloud (OAuth + Drive API)
 - OpenAI (embeddings, chat, validation, PDF fallback extraction)
 
 ## Repository layout
@@ -55,15 +55,12 @@ npm --version
 
 ## 1) Create / configure Google Cloud project
 
-This app requires Google OAuth + Picker + Drive API. Do this first so you have client ID, client secret, project number, and Picker API key for later steps.
+This app requires Google OAuth + Drive API. Do this first so you have client ID and client secret for later steps.
 
 ### 1.1 Create and configure the project
 
 1. Create a Google Cloud project.
-2. Save the **Project Number** (used by Picker as `VITE_GOOGLE_CLOUD_PROJECT_NUMBER`).
-3. Enable APIs:
-   - Google Drive API
-   - Google Picker API
+2. Enable **Google Drive API**.
 
 ### 1.2 Configure OAuth consent screen
 
@@ -86,15 +83,7 @@ This app requires Google OAuth + Picker + Drive API. Do this first so you have c
 
 These are used later as `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` (Supabase), and `VITE_GOOGLE_OAUTH_CLIENT_ID` / `VITE_GOOGLE_OAUTH_REDIRECT_URI` (owner app).
 
-### 1.4 Create API key for Google Picker
-
-1. Go to **Credentials** -> **Create Credentials** -> **API key**.
-2. Restrict it to:
-   - Google Picker API
-   - (optionally) HTTP referrers for your owner app domain
-3. Save it for use as `VITE_GOOGLE_PICKER_API_KEY`.
-
-**Outputs for next steps:** `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `VITE_GOOGLE_CLOUD_PROJECT_NUMBER`, `VITE_GOOGLE_PICKER_API_KEY`. Redirect URI will be set once you have your Supabase project ref.
+**Outputs for next steps:** `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`. Redirect URI will be set once you have your Supabase project ref.
 
 ---
 
@@ -214,8 +203,6 @@ These are set in Cloudflare Pages environment variables when you deploy the owne
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_GOOGLE_OAUTH_CLIENT_ID`
 - `VITE_GOOGLE_OAUTH_REDIRECT_URI` = `https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/drive_connect`
-- `VITE_GOOGLE_PICKER_API_KEY`
-- `VITE_GOOGLE_CLOUD_PROJECT_NUMBER`
 
 **Outputs for next steps:** All Supabase function secrets are set. Backend can be deployed and tested.
 
@@ -266,8 +253,6 @@ Fix any failures before deploying the owner app.
    - `VITE_SUPABASE_ANON_KEY=<YOUR_SUPABASE_ANON_KEY>`
    - `VITE_GOOGLE_OAUTH_CLIENT_ID=<YOUR_GOOGLE_OAUTH_CLIENT_ID>`
    - `VITE_GOOGLE_OAUTH_REDIRECT_URI=https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/drive_connect`
-   - `VITE_GOOGLE_PICKER_API_KEY=<YOUR_PICKER_API_KEY>`
-   - `VITE_GOOGLE_CLOUD_PROJECT_NUMBER=<YOUR_GOOGLE_PROJECT_NUMBER>`
 2. Deploy (trigger build or push to connected branch).
 3. Note the owner app URL (e.g. `https://owner-app.<your-pages-domain>.pages.dev` or custom domain).
 
@@ -290,7 +275,7 @@ In the deployed owner app:
 2. Create a project and set **allowed origins** (e.g. `https://example.com`).
 3. Configure rate limits and quotas.
 4. Connect Google Drive from settings.
-5. Add at least one source (Docs/Slides/PDF) via Picker.
+5. Add at least one source (Docs/Slides/PDF) by entering a Drive URL or file ID in project settings.
 6. Trigger **Re-sync** for that source so ingestion jobs are enqueued.
 
 Confirm no console or runtime errors and that Drive connection and source creation succeed. Proceed to manual ingest run.

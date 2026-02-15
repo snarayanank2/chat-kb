@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
+  extractDriveFileId,
   getDriveConnectUrl,
-  mapMimeTypeToSourceType,
-  pickDriveDocuments,
+  inferSourceTypeFromUrl,
+  sourceTypeToMimeType,
+  type SourceType,
 } from "../lib/drive";
 import { supabase } from "../lib/supabase";
 import { parseOrigins, validateOrigins } from "../lib/validation";
@@ -48,8 +50,11 @@ export function ProjectSettingsPage() {
     HIGH_SIGNAL_EVENTS,
   );
   const [driveConnecting, setDriveConnecting] = useState(false);
-  const [pickerLoading, setPickerLoading] = useState(false);
+  const [addSourceLoading, setAddSourceLoading] = useState(false);
   const [sourceActionLoadingId, setSourceActionLoadingId] = useState<string | null>(null);
+  const [newSourceInput, setNewSourceInput] = useState("");
+  const [newSourceType, setNewSourceType] = useState<SourceType>("gdoc");
+  const [newSourceTitle, setNewSourceTitle] = useState("");
 
   const [form, setForm] = useState({
     rate_rpm: 60,
@@ -225,6 +230,11 @@ export function ProjectSettingsPage() {
     });
   }, [selectedEventFilters, project?.id]);
 
+  useEffect(() => {
+    const inferred = inferSourceTypeFromUrl(newSourceInput);
+    if (inferred) setNewSourceType(inferred);
+  }, [newSourceInput]);
+
   const updateProjectSettings = async (event: FormEvent) => {
     event.preventDefault();
     if (!project) return;
@@ -311,83 +321,68 @@ export function ProjectSettingsPage() {
     }
   };
 
-  const addSourcesFromPicker = async () => {
+  const addSourceFromManualEntry = async (event: FormEvent) => {
+    event.preventDefault();
     if (!project) return;
     if (!connection) {
       setError("Connect Google Drive first before adding sources.");
       return;
     }
 
+    const fileId = extractDriveFileId(newSourceInput);
+    if (!fileId) {
+      setError("Enter a valid Google Drive URL or file ID (e.g. docs.google.com/document/d/... or drive.google.com/file/d/...).");
+      return;
+    }
+
+    const inferredType = inferSourceTypeFromUrl(newSourceInput);
+    const sourceType = inferredType ?? newSourceType;
+    const mimeType = sourceTypeToMimeType(sourceType);
+    const title = newSourceTitle.trim() || fileId;
+
     setError(null);
     setNotice(null);
-    setPickerLoading(true);
+    setAddSourceLoading(true);
 
     try {
-      const picked = await pickDriveDocuments();
-      if (!picked.length) {
-        setNotice("No files selected.");
-        return;
-      }
-
-      const rowsToInsert = picked
-        .map((doc) => {
-          const sourceType = mapMimeTypeToSourceType(doc.mimeType);
-          if (!sourceType) return null;
-          return {
-            project_id: project.id,
-            source_type: sourceType,
-            drive_file_id: doc.id,
-            mime_type: doc.mimeType,
-            title: doc.name || doc.id,
-            status: "pending" as const,
-          };
-        })
-        .filter((row): row is NonNullable<typeof row> => row !== null);
-
-      if (!rowsToInsert.length) {
-        setError("Only Google Docs, Google Slides, and PDF files are supported.");
-        return;
-      }
-
-      const driveIds = rowsToInsert.map((row) => row.drive_file_id);
       const { data: existing, error: existingError } = await supabase
         .from("project_sources")
         .select("drive_file_id")
         .eq("project_id", project.id)
-        .in("drive_file_id", driveIds);
+        .eq("drive_file_id", fileId);
 
-      if (existingError) {
-        throw existingError;
-      }
-
-      const existingIds = new Set((existing ?? []).map((row) => row.drive_file_id));
-      const dedupedRows = rowsToInsert.filter((row) => !existingIds.has(row.drive_file_id));
-      const duplicateCount = rowsToInsert.length - dedupedRows.length;
-
-      if (!dedupedRows.length) {
-        setNotice("All selected files are already attached to this project.");
+      if (existingError) throw existingError;
+      if ((existing ?? []).length > 0) {
+        setError("This file is already attached to this project.");
+        setAddSourceLoading(false);
         return;
       }
 
-      const { error: insertError } = await supabase.from("project_sources").insert(dedupedRows);
+      const { error: insertError } = await supabase.from("project_sources").insert({
+        project_id: project.id,
+        source_type: sourceType,
+        drive_file_id: fileId,
+        mime_type: mimeType,
+        title,
+        status: "pending",
+      });
+
       if (insertError) {
         if ((insertError as { code?: string }).code === "23505") {
-          setError("One or more selected files are already attached to this project.");
+          setError("This file is already attached to this project.");
           return;
         }
         throw insertError;
       }
 
+      setNewSourceInput("");
+      setNewSourceTitle("");
       await loadObservability(project.id);
-      setNotice(
-        `Added ${dedupedRows.length} source${dedupedRows.length === 1 ? "" : "s"} as pending.${
-          duplicateCount > 0 ? ` Skipped ${duplicateCount} duplicate selection(s).` : ""
-        }`,
-      );
+      setNotice("Source added as pending.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add selected Drive sources.");
+      setError(err instanceof Error ? err.message : "Failed to add Drive source.");
     } finally {
-      setPickerLoading(false);
+      setAddSourceLoading(false);
     }
   };
 
@@ -467,14 +462,46 @@ export function ProjectSettingsPage() {
                 ? "Reconnect Drive"
                 : "Connect Drive"}
           </button>
-          <button
-            type="button"
-            onClick={() => void addSourcesFromPicker()}
-            disabled={pickerLoading || !connection}
-          >
-            {pickerLoading ? "Opening picker..." : "Add Drive sources"}
-          </button>
         </div>
+        {connection ? (
+          <form className="add-source-form" onSubmit={addSourceFromManualEntry}>
+            <label>
+              <span>Drive URL or file ID</span>
+              <input
+                type="text"
+                value={newSourceInput}
+                onChange={(e) => setNewSourceInput(e.target.value)}
+                placeholder="https://docs.google.com/document/d/... or file ID"
+                disabled={addSourceLoading}
+              />
+            </label>
+            <label>
+              <span>Type</span>
+              <select
+                value={newSourceType}
+                onChange={(e) => setNewSourceType(e.target.value as SourceType)}
+                disabled={addSourceLoading}
+              >
+                <option value="gdoc">Google Doc</option>
+                <option value="gslides">Google Slides</option>
+                <option value="gpdf">PDF</option>
+              </select>
+            </label>
+            <label>
+              <span>Title (optional)</span>
+              <input
+                type="text"
+                value={newSourceTitle}
+                onChange={(e) => setNewSourceTitle(e.target.value)}
+                placeholder="Display name"
+                disabled={addSourceLoading}
+              />
+            </label>
+            <button type="submit" disabled={addSourceLoading || !newSourceInput.trim()}>
+              {addSourceLoading ? "Adding..." : "Add source"}
+            </button>
+          </form>
+        ) : null}
         {connection ? (
           <p className="muted small-text">
             Connected subject: <code>{connection.google_subject}</code>

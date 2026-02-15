@@ -94,10 +94,10 @@
 - [x] Add key rotation plan (read-old/write-new strategy).
 - [x] Add unit tests for encryption roundtrip and invalid key handling.
 
-### 3.3 File picker + source linking
-- [x] Integrate Google file picker in owner app.
+### 3.3 Manual source entry + source linking
+- [x] Add manual Drive URL/file ID entry in owner app (no Google Picker).
 - [x] Support allowed source types: Docs, Slides, PDF.
-- [x] Persist source selections into `project_sources` with status `pending`.
+- [x] Persist source entries into `project_sources` with status `pending`.
 - [x] Add duplicate-source detection by `(project_id, drive_file_id)`.
 - [x] Provide source list UI with remove/re-sync actions.
 
@@ -259,7 +259,7 @@
 - [ ] Implement initial `chat` with retrieval, citations, and basic rate/quota checks.
 
 ## Definition of done for v1
-- [ ] Owner can connect Drive, select files, and manually re-sync successfully.
+- [ ] Owner can connect Drive, add sources (URL/file ID), and manually re-sync successfully.
 - [ ] Widget can be embedded on allowed origins and blocked elsewhere.
 - [ ] Chat answers include citations tied to ingested sources.
 - [ ] Input/output validation and retrieval hardening are active in production.

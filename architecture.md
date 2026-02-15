@@ -6,7 +6,7 @@ Summary
 
 Build a hosted SaaS where:
 	•	Users sign in with Google via Supabase Auth.
-	•	Users connect Google Drive via a separate, minimal-scope OAuth flow (file-picker only).
+	•	Users connect Google Drive via a separate, minimal-scope OAuth flow.
 	•	Users create projects and attach specific Docs/Slides/PDFs as a knowledge base.
 	•	The system ingests, chunks, embeds, and stores content per project.
 	•	Third-party websites embed a chat widget (no secret). Access control is via allowed origins plus rate limits, quotas, and audit logs.
@@ -18,7 +18,7 @@ Build a hosted SaaS where:
 
 Goals
 	•	Single-user projects (owner only).
-	•	User-selected Drive files only (file picker flow).
+	•	User-added Drive files only (manual URL/ID entry).
 	•	Manual re-sync only (no polling).
 	•	Embeddable web widget as the primary integration surface.
 	•	Citations in answers (doc/slide/page).
@@ -38,7 +38,7 @@ Components
 	1.	Frontend (Owner App)
 	•	Project CRUD (create/list/delete)
 	•	Configure allowed origins, rate limits, quotas
-	•	Drive connect + file picker UI
+	•	Drive connect + manual source entry (Drive URL or file ID)
 	•	Add/remove sources + trigger re-sync
 	•	View ingestion status, audit summaries (optional)
 	2.	Widget (Third-party Embed)
@@ -51,7 +51,7 @@ Components
 	•	pgvector: semantic retrieval
 	•	Edge Functions: OAuth callback, ingestion, embed session, chat
 	4.	Google APIs
-	•	OAuth + file picker (minimal Drive scope)
+	•	OAuth + Drive API (minimal scope)
 	•	Drive export/download for Docs/Slides/PDFs
 	5.	OpenAI
 	•	Embeddings
@@ -71,15 +71,15 @@ Components
 
 Purpose: obtain refresh token and minimal Drive scope for later server-side fetching.
 	1.	Owner clicks “Connect Drive”.
-	2.	OAuth requests minimal scope appropriate for file-picker style.
+	2.	OAuth requests minimal Drive scope.
 	3.	OAuth callback hits Edge Function drive_connect:
 	•	exchange code → tokens
 	•	store encrypted refresh token tied to owner user id
 
-3.3 Add Source (User-selected files)
-	1.	Owner opens file picker, selects Docs/Slides/PDFs.
-	2.	App stores file IDs and metadata in project_sources.
-	3.	Mark sources as pending.
+3.3 Add Source (Manual URL/ID entry)
+	1.	Owner enters a Google Drive URL or file ID and source type (Doc/Slides/PDF) in project settings.
+	2.	App stores file ID and metadata in project_sources.
+	3.	Mark source as pending.
 
 3.4 Manual Re-sync (Ingestion)
 	1.	Owner clicks “Re-sync” for a source or project.
@@ -409,8 +409,7 @@ flowchart LR
   Owner -->|Drive OAuth| DriveConnect[Edge: drive_connect]
   DriveConnect --> DB
 
-  Owner -->|Pick file IDs| GooglePicker[Google File Picker]
-  Owner -->|Add sources| DB
+  Owner -->|Add sources (URL or file ID)| DB
 
   Owner -->|Re-sync| Resync[Edge: kb_resync] --> Jobs[(ingest_jobs)]
   Runner[Edge: ingest_runner] --> Jobs
